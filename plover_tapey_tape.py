@@ -14,6 +14,7 @@ import pathlib
 import re
 
 import plover
+from plover.machine.base import STATE_RUNNING
 
 CONFIG_DIR = pathlib.Path(plover.oslayer.config.CONFIG_DIR)
 
@@ -148,11 +149,49 @@ class TapeyTape:
         self.engine = engine
         self.last_stroke_time = None
         self.was_fingerspelling = False
+        self.config = {}
 
     def start(self):
+        self._load_config()
+
+        # e.g., 1- -> S-, 2- -> T-, etc.
+        self.numbers = {number: letter for letter, number in plover.system.NUMBERS.items()}
+
+        self.engine.hook_connect('stroked', self.on_stroked)
+        self.engine.hook_connect('machine_state_changed', self._machine_state_changed)
+        self.engine.hook_connect('translated', self._translated)
+
+    def stop(self):
+        if self.was_fingerspelling:
+            self.file.write(expand(self.right_format, self.items).rstrip())
+            self.file.write('\n')
+
+        self.engine.hook_disconnect('stroked', self.on_stroked)
+        self.engine.hook_disconnect('machine_state_changed', self._machine_state_changed)
+        self.engine.hook_disconnect('translated', self._translated)
+
+        self.file.close()
+
+    def _machine_state_changed(self, _machine_type, machine_state):
+        if machine_state == STATE_RUNNING:
+            self.file.close()
+            self._load_config()
+
+    def _translated(self, _old, new):
+        if len(new) == 0:
+            return
+
+        action = new[0]
+
+        if action.command and action.command.upper() == "SET_CONFIG":
+            self.file.close()
+            self._load_config()
+
+    def _load_config(self):
         try:
             with (CONFIG_DIR / 'tapey_tape.json').open(encoding='utf-8') as f:
                 config = json.load(f)
+                f.close()
         except FileNotFoundError:
             config = {}
         else:
@@ -172,7 +211,6 @@ class TapeyTape:
              'a JSON object mapping strings to strings', {}),
         )
 
-        self.config = {}
         for option, type_, condition, description, default in options:
             try:
                 value = config[option]
@@ -193,20 +231,6 @@ class TapeyTape:
 
         self.dictionary_names = {str(make_absolute(filename)): name
                                  for filename, name in self.config['dictionary_names'].items()}
-
-        # e.g., 1- -> S-, 2- -> T-, etc.
-        self.numbers = {number: letter for letter, number in plover.system.NUMBERS.items()}
-
-        self.engine.hook_connect('stroked', self.on_stroked)
-
-    def stop(self):
-        if self.was_fingerspelling:
-            self.file.write(expand(self.right_format, self.items).rstrip())
-            self.file.write('\n')
-
-        self.engine.hook_disconnect('stroked', self.on_stroked)
-
-        self.file.close()
 
     def on_stroked(self, stroke):
         # Do nothing if typing in QWERTY while Plover is off
