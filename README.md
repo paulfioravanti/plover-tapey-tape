@@ -125,6 +125,36 @@ because you’re using an older version of Plover. Please see the
 [Plugins](https://github.com/openstenoproject/plover/wiki/Plugins)
 page on the Plover Wiki for instructions.)
 
+### Fork Installation
+
+```sh
+git clone git@github.com:paulfioravanti/plover-tapey-tape.git
+cd plover-tapey-tape
+plover -s plover_plugins install .
+```
+
+`plover` should be a reference/symbolic link to your installed version of
+Plover. See the
+[Command Line Reference](https://plover.readthedocs.io/en/latest/cli_reference.html)
+for details.
+
+This fork enables changes in Tapey Tape config (`tapey_tape.json`) to be re-read
+in by just pressing the Plover UI reconnect button, rather than restarting
+Plover itself.
+
+It uses some of the steno engine's stated private APIs to achieve the use case,
+since there seems to currently be no other way to have plugin extension config
+files be re-read in without restarting Plover.
+
+Looking at the steno engine code for
+[starting/stopping extensions](https://github.com/openstenoproject/plover/blob/master/plover/engine.py#L287),
+it doesn't *seem* like there would be any issues using these private APIs, but
+since that is currently unclear, this code should just be considered
+experimental for now.
+
+If Plover removes or changes the private APIs that this fork relies on, it
+should just degrade to Tapey Tape's default behavior.
+
 ## Configuration
 
 You can customize the behaviour of this plugin by creating a
